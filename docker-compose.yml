@@ -1,0 +1,38 @@
+version: "3.7"
+
+services:
+  db:
+    restart: unless-stopped
+    image: postgres:16.3-alpine
+    ports:
+      - "5432"
+    env_file: ./.env
+    volumes:
+      - ./docker-volumes/postgres_data:/var/lib/postgresql/data
+  redis:
+    restart: unless-stopped
+    image: redis:7-alpine
+    ports:
+      - "6379"
+
+  api:
+    restart: always
+    build:
+      context: .
+      args:
+        USER_UID: ${USER_UID:-999}
+    stdin_open: true
+    tty: true
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file: ./.env
+    volumes:
+      - ./school_schedule_api/:/app/school_schedule_api
+    depends_on:
+      - db
+      - redis
+    command: >
+      sh -c "/app/scripts/wait-for-psql.sh db &&
+               python manage.py makemigrations &&
+               python manage.py migrate &&
+               python manage.py runserver 0.0.0.0:8000"
